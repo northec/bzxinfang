@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  username      String   @unique
+  password_hash String
+  name          String
+  department_id Int?
+  role          String   @default("handler")
+  phone         String?
+  created_at    DateTime @default(now())
+
+  department    Department?   @relation("DeptUsers", fields: [department_id], references: [id])
+  leaderDepts   Department[]  @relation("DeptLeader")
+  progress      CaseProgress[]
+  uploadedFiles Attachment[]
+  mergeRecords  MergeRecord[] @relation("Merger")
+  handledCases  Case[]        @relation("CaseHandler")
+}
+
+model Department {
+  id        Int  @id @default(autoincrement())
+  name      String
+  parent_id Int?
+  type      String @default("办案科室")
+  leader_id Int?
+
+  parent    Department?  @relation("DeptTree", fields: [parent_id], references: [id])
+  children  Department[] @relation("DeptTree")
+  leader    User?        @relation("DeptLeader", fields: [leader_id], references: [id])
+  users     User[]       @relation("DeptUsers")
+  cases     Case[]       @relation("DeptCases")
+}
+
+model Case {
+  id                      Int       @id @default(autoincrement())
+  case_no                 String    @unique
+  title                   String
+  petitioner_name         String
+  petitioner_phone        String
+  case_type               String    @default("其他")
+  source                  String    @default("其他")
+  content                 String
+  status                  String    @default("新建")
+  parent_id               Int?
+  is_main                 Boolean   @default(true)
+  dispatch_department_id  Int?
+  co_departments          String?
+  deadline                DateTime?
+  handler_id              Int?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  parent                Case?           @relation("CaseSplit", fields: [parent_id], references: [id])
+  children              Case[]          @relation("CaseSplit")
+  progress              CaseProgress[]
+  attachments           Attachment[]
+  mainMerges            MergeRecord[]   @relation("MainMerge")
+  dispatchDepartment    Department?     @relation("DeptCases", fields: [dispatch_department_id], references: [id])
+  handler               User?           @relation("CaseHandler", fields: [handler_id], references: [id])
+}
+
+model CaseProgress {
+  id          Int      @id @default(autoincrement())
+  case_id     Int
+  operator_id Int
+  action      String
+  description String
+  old_status  String?
+  new_status  String?
+  created_at  DateTime @default(now())
+
+  case     Case @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  operator User @relation(fields: [operator_id], references: [id])
+}
+
+model Attachment {
+  id          Int      @id @default(autoincrement())
+  case_id     Int
+  filename    String
+  filepath    String
+  uploader_id Int
+  created_at  DateTime @default(now())
+
+  case     Case @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploader_id], references: [id])
+}
+
+model MergeRecord {
+  id              Int      @id @default(autoincrement())
+  main_case_id    Int
+  merged_case_ids String
+  merged_at       DateTime @default(now())
+  merged_by       Int
+
+  mainCase Case @relation("MainMerge", fields: [main_case_id], references: [id])
+  merger   User @relation("Merger", fields: [merged_by], references: [id])
+}
